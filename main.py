@@ -47,7 +47,7 @@ parser.add_argument('--valid_dir', default='val', type=str)
 
 parser.add_argument('--mode', default='train', type=str)
 
-parser.add_argument('--train_file', default='total.txt', type=str)
+parser.add_argument('--train_file', default='train.txt', type=str)
 
 parser.add_argument('--valid_file', default='val.txt', type=str)
 
