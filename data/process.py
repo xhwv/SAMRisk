@@ -191,14 +191,14 @@ class process(Dataset):
             return sample['image3d'], sample['time'], sample['status'], sample['radiomic']
             # return sample['image3d'], sample['time'],sample['status'],sample['radiomic'],sample['clinical'],sample['hcr']
         elif self.mode == 'valid':
-            image3d,image2d, time,status,radiomic = pkload(path + 'fusion.pkl')
+            image3d,image2d, time,status,radiomic = pkload(path + 'sr.pkl')
             sample = {'image3d': image3d, 'time': time, 'status': status, 'radiomic': radiomic}
             sample = transform_valid3d(sample)
             sample['radiomic'] = np.array(sample['radiomic']).astype(np.float32)
 
             return sample['image3d'], sample['time'], sample['status'], sample['radiomic']
         else:
-            image = pkload(path + 'fusion.pkl')
+            image = pkload(path + 'sr.pkl')
             image = np.pad(image, ((0, 0), (0, 0), (0, 5), (0, 0)), mode='constant')
             image = np.ascontiguousarray(image.transpose(3, 0, 1, 2))
             image = torch.from_numpy(image).float()
