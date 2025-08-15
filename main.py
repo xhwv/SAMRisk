@@ -62,8 +62,6 @@ parser.add_argument('--weight_decay', default=1e-5, type=float)
 
 parser.add_argument('--amsgrad', default=True, type=bool)
 
-parser.add_argument('--criterion', default='softmax_dice', type=str)
-
 parser.add_argument('--num_class', default=1, type=int)
 
 parser.add_argument('--seed', default=1000, type=int)
@@ -111,38 +109,6 @@ def CoxLoss(hazard_pred,survtime, censor):
     exp_theta = torch.exp(theta)
     loss_cox = -torch.mean((theta - torch.log(torch.sum(exp_theta*R_mat, dim=1))) * censor)
     return loss_cox
-def R_set(x):
-    '''Create an indicator matrix of risk sets, where T_j >= T_i.
-    Note that the input data have been sorted in descending order.
-    Input:
-        x: a PyTorch tensor that the number of rows is equal to the number of samples.
-    Output:
-        indicator_matrix: an indicator matrix (which is a lower traiangular portions of matrix).
-    '''
-    n_sample = x.size(0)
-    matrix_ones = torch.ones(n_sample, n_sample)
-    indicator_matrix = torch.tril(matrix_ones)
-
-    return (indicator_matrix)
-def compute_iou(pred_mask, gt_semantic_seg):
-    in_mask = np.logical_and(gt_semantic_seg, pred_mask)
-    out_mask = np.logical_or(gt_semantic_seg, pred_mask)
-    iou = np.sum(in_mask) / np.sum(out_mask)
-    return iou
-
-def compute_dice(mask_gt, mask_pred):
-    """Compute soerensen-dice coefficient.
-    Returns:
-    the dice coeffcient as float. If both masks are empty, the result is NaN
-    """
-    volume_sum = mask_gt.sum() + mask_pred.sum()
-    if volume_sum == 0:
-        return np.NaN
-    volume_intersect = (mask_gt & mask_pred).sum()
-    return 2*volume_intersect / volume_sum
-def count_parameters(model):
-    return sum(p.numel() for p in model.parameters() if p.requires_grad)
-
 
 def setup_seed(seed):
     torch.manual_seed(seed)
@@ -151,46 +117,6 @@ def setup_seed(seed):
     random.seed(seed)
     torch.backends.cudnn.deterministic = True
 
-
-# 设置随机数种子
-
-def c_index(pred, ytime, yevent):
-    '''Calculate concordance index to evaluate models.
-    Input:
-        pred: linear predictors from trained model.
-        ytime: true survival time from load_data().
-        yevent: true censoring status from load_data().
-    Output:
-        concordance_index: c-index (between 0 and 1).
-    '''
-    n_sample = len(ytime)
-    ytime_indicator = R_set(ytime)
-    ytime_matrix = ytime_indicator - torch.diag(torch.diag(ytime_indicator))
-    ###T_i is uncensored
-    censor_idx = (yevent == 0).nonzero()
-    zeros = torch.zeros(n_sample)
-    ytime_matrix[censor_idx, :] = zeros
-    ###1 if pred_i < pred_j; 0.5 if pred_i = pred_j
-    pred_matrix = torch.zeros_like(ytime_matrix)
-    for j in range(n_sample):
-        for i in range(n_sample):
-            if pred[i] < pred[j]:
-                pred_matrix[j, i] = 1
-            elif pred[i] == pred[j]:
-                pred_matrix[j, i] = 0.5
-
-    concord_matrix = pred_matrix.mul(ytime_matrix)
-    ###numerator
-    concord = torch.sum(concord_matrix)
-    ###denominator
-    epsilon = torch.sum(ytime_matrix)
-    ###c-index = numerator/denominator
-    concordance_index = torch.div(concord, epsilon)
-    ###if gpu is being used
-    if torch.cuda.is_available():
-        concordance_index = concordance_index.cuda()
-    ###
-    return concordance_index
 def get_points(prev_masks, gt3D, click_points, click_labels):
     batch_points, batch_labels = click_methods['default'](prev_masks, gt3D)
 
@@ -225,6 +151,7 @@ def batch_forward(sam_model, image_embedding, gt3D, low_res_masks, points=None):
     )
     prev_masks = F.interpolate(low_res_masks, size=gt3D.shape[-3:], mode='trilinear', align_corners=False)
     return low_res_masks, prev_masks
+  
 def interaction(sam_model, image_embedding, gt3D, num_clicks,click_points,click_labels):
         seg_loss = DiceCELoss(sigmoid=True, squared_pred=True, reduction='mean')
         return_loss = 0
@@ -242,38 +169,8 @@ def interaction(sam_model, image_embedding, gt3D, num_clicks,click_points,click_
             return_loss += loss
         return prev_masks, return_loss,click_points,click_labels
 
-def get_iou_score(prev_masks, gt3D):
-    def compute_iou(mask_pred, mask_gt):
-        in_mask = np.logical_and(mask_gt, mask_pred)
-        out_mask = np.logical_or(mask_gt, mask_pred)
-        iou = np.sum(in_mask) / np.sum(out_mask)
-        return iou
 
-    pred_masks = (prev_masks > 0.5).cpu().numpy()  # Assuming tensor, convert to boolean numpy array
-    true_masks = (gt3D > 0).cpu().numpy()          # Assuming tensor, convert to boolean numpy array
-    iou_list = []
-    for i in range(true_masks.shape[0]):
-        iou_list.append(compute_iou(pred_masks[i], true_masks[i]))
-    return sum(iou_list) / len(iou_list)
-def get_dice_score(prev_masks, gt3D):
-    def compute_dice(mask_pred, mask_gt):
-        mask_threshold = 0.5
 
-        mask_pred = (mask_pred > mask_threshold)
-        mask_gt = (mask_gt > 0)
-
-        volume_sum = mask_gt.sum() + mask_pred.sum()
-        if volume_sum == 0:
-            return np.NaN
-        volume_intersect = (mask_gt & mask_pred).sum()
-        return 2 * volume_intersect / volume_sum
-
-    pred_masks = (prev_masks > 0.5)
-    true_masks = (gt3D > 0)
-    dice_list = []
-    for i in range(true_masks.shape[0]):
-        dice_list.append(compute_dice(pred_masks[i], true_masks[i]))
-    return (sum(dice_list) / len(dice_list)).item()
 def finetune_model_predict3D(img3D, gt3D, sam_model_tune, num_clicks=10
                              ,click_points=None,click_labels=None):
 
@@ -285,6 +182,7 @@ def finetune_model_predict3D(img3D, gt3D, sam_model_tune, num_clicks=10
     print_iou=get_iou_score(prev_masks,gt3D)
 
     return prev_masks, click_points_batch, click_labels_batch, print_iou, print_dice, loss
+                               
 class Swish(nn.Module):
     def __init__(self):
         super(Swish, self).__init__()
@@ -321,11 +219,9 @@ def lggloss(hazard_pred, clinical, survtime, censor):
     n=0
     for i in range(current_batch_len):
         for j in range(i + 1, current_batch_len):
-            agei=clinical[i][1]*77+17
-            agej=clinical[j][1]*77+17
+            agei=clinical[i][1]
+            agej=clinical[j][1]
             if agei<40 and agej>=40:
-
-                # 确保逻辑表达式用括号正确，且修改TNM分期的比较条件
                 if  clinical[i][2]==0 and clinical[j][2] ==0:
                         n=n+1
                         riski=estimate_risk(agei)
@@ -343,8 +239,8 @@ def hggloss(hazard_pred, clinical, survtime, censor):
     n=0
     for i in range(current_batch_len):
         for j in range(i + 1, current_batch_len):
-            agei=clinical[i][1]*77+17
-            agej=clinical[j][1]*77+17
+            agei=clinical[i][1]
+            agej=clinical[j][1]
             if agei<65 and agej>=65:
                 if (clinical[i][2] in [1, 2]) and (clinical[j][2] in [1, 2]):
                         n=n+1
@@ -353,38 +249,11 @@ def hggloss(hazard_pred, clinical, survtime, censor):
                         alpha1 = riskj - riski
                         alpha1=swish2(alpha1/8)
                         rank_loss_1 += torch.log(1 + torch.exp(alpha1 * (hazard_pred[i] - hazard_pred[j])))
-    # 确保损失函数不会除以零
-    # loss = rank_loss_1 / (current_batch_len * (current_batch_len - 1) / 2) if current_batch_len > 1 else 0
+
     if n>0:
       rank_loss_1 = rank_loss_1 / n
     return rank_loss_1 if n >= 1 else 0
 
-def Clinicaloss(hazard_pred, clinical, survtime, censor):
-    current_batch_len = len(survtime)
-    rank_loss_1 = 0
-    alpha1 = 0.1
-    for i in range(current_batch_len):
-        for j in range(i + 1, current_batch_len):
-            if censor[i] == 0 and censor[j] == 0:  # 如果两个样本都被观测到，计算排序损失
-                # 确保逻辑表达式用括号正确，且修改TNM分期的比较条件
-                if  (0.9 < clinical[i][2] < 2.1) and (clinical[j][2] ==0):
-
-                    if hazard_pred[i] <= hazard_pred[j]:
-                        rank_loss_1 += torch.log(1 + torch.exp(alpha1 * (hazard_pred[j] - hazard_pred[i])))
-    # 确保损失函数不会除以零
-    loss = rank_loss_1 / (current_batch_len * (current_batch_len - 1) / 2) if current_batch_len > 1 else 0
-    return loss
-
-def adjust_learning_rate(optimizer, epoch, end_epoch, base_lr):
-    """
-    每10个epoch将学习率衰减为原始(base_lr)的0.9^(epoch//10)倍。
-    例：epoch 0-9: base_lr；10-19: 0.9*base_lr；20-29: 0.9^2*base_lr ...
-    """
-    factor = 0.9 ** (epoch // 10)
-    lr = base_lr * factor
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = lr
-    return lr  # 返回当前学习率，便于打印
 
 class MultiTaskLossWrapper_OS(nn.Module):
     def __init__(self, loss_fn):
