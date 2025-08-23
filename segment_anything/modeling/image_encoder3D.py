@@ -7,7 +7,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from models.binlicox.DCN3D import *
 from typing import Optional, Tuple, Type
 from torch.nn import init, Parameter
 
