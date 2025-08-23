@@ -2,8 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from timm.models.layers import DropPath, trunc_normal_
-from models.binlicox.DCN3D import *
-
 
 from spconv import pytorch as spconv
 
