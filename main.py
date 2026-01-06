@@ -31,14 +31,6 @@ parser.add_argument('--user', default='name of user', type=str)
 
 parser.add_argument('--experiment', default='UCSF', type=str)
 
-parser.add_argument('--date', default=local_time.split(' ')[0], type=str)
-
-parser.add_argument('--description',
-                    default='TransBTS,'
-                            'training on train.txt!',
-                    type=str)
-
-# DataSet Information
 parser.add_argument('--root', default='', type=str)
 
 parser.add_argument('--train_dir', default='train', type=str)
@@ -76,9 +68,7 @@ parser.add_argument('--batch_size', default=8, type=int)
 
 parser.add_argument('--start_epoch', default=0, type=int)
 
-parser.add_argument('--end_epoch', default=10000, type=int)
-
-parser.add_argument('--save_freq', default=10000, type=int)
+parser.add_argument('--end_epoch', default=2000, type=int)
 
 parser.add_argument('--resume', default='', type=str)
 
