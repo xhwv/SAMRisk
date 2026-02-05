@@ -551,26 +551,6 @@ def main_worker():
 
 from sklearn.utils import resample
 import numpy as np
-def bootstrap_c_index(true_event_times, predicted_scores, true_statuses, n_bootstrap=1000):
-    c_indexes = []
-    for _ in range(n_bootstrap):
-        indices = resample(np.arange(len(true_event_times))) # 生成bootstrap样本的索引
-        bs_event_times = true_event_times[indices]
-        bs_predicted_scores = predicted_scores[indices]
-        bs_statuses = true_statuses[indices]
-
-        c_index_value = concordance_index(bs_event_times, -bs_predicted_scores, bs_statuses)
-        c_indexes.append(c_index_value)
-
-    # 计算置信区间
-    c_indexes = np.array(c_indexes)
-
-    lower_bound = np.percentile(c_indexes, 2.5)  # 2.5%分位数
-    upper_bound = np.percentile(c_indexes, 97.5)  # 97.5%分位数
-
-    return lower_bound, upper_bound
-
-
 
 
 def cox_log_rank(hazardsdata,survtime_all,labels):
