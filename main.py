@@ -180,25 +180,6 @@ class Swish(nn.Module):
     def forward(self, x):
         return x * torch.sigmoid(self.beta * x)
 
-def estimate_risk(age):
-    if age >= 0 and age <= 9:
-        return 1
-    elif age >= 10 and age <= 19:
-        return 1
-    elif age >= 20 and age <= 29:
-        return 0.91
-    elif age >= 30 and age <= 39:
-        return 1.12
-    elif age >= 40 and age <= 49:
-        return 1.71
-    elif age >= 50 and age <= 59:
-        return 2.41
-    elif age >= 60 and age <= 69:
-        return 3.27
-    elif age >= 70 and age <= 79:
-        return 5.18
-    elif age >= 80 :
-        return 8.44
 
 swish1=Swish()
 swish2=Swish()
